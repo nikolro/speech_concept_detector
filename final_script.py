@@ -123,7 +123,6 @@ HTML_TEMPLATE = '''
                 return true;
             };
 
-    // Move useEffect to component level
     React.useEffect(() => {
     }, [definitions]);
 
@@ -158,11 +157,6 @@ HTML_TEMPLATE = '''
 
         // Modify the loadContext function to call getDefinitions
         const loadContext = () => {
-            if (!context.trim()) {
-                setError('Please enter context text');
-                return;
-            }
-            
             // Clean and process keywords
             const words = context
                 .split(/[,\s]+/)
@@ -184,17 +178,17 @@ HTML_TEMPLATE = '''
             updateStats('');
         };
 
+            const totalWordsRef = React.useRef(0);
+            const matchesRef = React.useRef(0);
+
             const updateStats = (newText) => {
-                const words = (transcript + newText).split(/\s+/).filter(w => w.trim());
-                setTotal(words.length);
+                const newWords = newText.split(/\s+/).filter(w => w.trim());                
+                totalWordsRef.current += newWords.length;
+                setTotal(totalWordsRef.current);
             };
 
             const startRecording = () => {
                 if (!checkBrowserSupport()) return;
-                if (!keywords.size) {
-                    setError('Please load context first');
-                    return;
-                }
 
                 try {
                     recognitionRef.current = new webkitSpeechRecognition();
@@ -262,14 +256,18 @@ HTML_TEMPLATE = '''
                 return word;
             });
 
-            setMatches(matchCount); // Update matches state
+            matchesRef.current += matchCount;
+            setMatches(matchesRef.current);
             return highlightedWords.join(' ');
         };
 
             const clearTranscript = () => {
                 setTranscript('');
                 setStatus('Transcript cleared');
-                setStats({ total: 0, matches: 0 });
+                totalWordsRef.current = 0;
+                matchesRef.current = 0; 
+                setTotal(0);
+                setMatches(0);
             };
 
             // Update handleMouseOver to show loading state
@@ -405,16 +403,6 @@ CORS(app)
 @app.route('/')
 def home():
     return Markup(HTML_TEMPLATE)
-
-@app.route('/process_text', methods=['POST'])
-def process_text():
-    data = request.get_json()
-    text = data.get('text')
-    keywords = data.get('keywords')
-    if not text or not keywords:
-        return jsonify({'error': 'Missing text or keywords'}), 400
-    processed_text = correct_and_highlight_with_gpt4(text, keywords)
-    return jsonify({'processed_text': processed_text})
 
 @app.route('/get_definitions', methods=['POST'])
 def get_definitions():
